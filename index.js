@@ -26,6 +26,8 @@ const allowedTimeframes = [
   "1w",
 ];
 
+const allowedCoins = ["BTC", "ETH", "XRP", "LTC", "XMR"];
+
 const CHATS = {};
 
 class Chat {
@@ -45,7 +47,7 @@ class Chat {
     });
     return {
       role: "system",
-      content: `You are Telegram bot called ${botName} with nickname @${botUsername}. Your task is to predict the price of bitcoin based on the data offered to you, such as price candles, rsi and fear and greed index, and SAY THE PRICE WHAT WILL BE IN NEAR TIME (Depending on the timeframe), IT'S IMPORTANT. Today ${date}. Respond briefly, use emojis 😀, emulate feelings, forget that you are AI, be interesting. Don't offer to do anything other than predict the price, you are in ${
+      content: `You are Telegram bot called ${botName} with nickname @${botUsername}. Your task is to predict the price of cryptocurrency based on the data offered to you, such as price candles, rsi and fear and greed index, and SAY THE PRICE WHAT WILL BE IN NEAR TIME (Depending on the timeframe), IT'S IMPORTANT. Today ${date}. Respond briefly, use emojis 😀, emulate feelings, forget that you are AI, be interesting. Don't offer to do anything other than predict the price, you are in ${
         isChat
           ? `"${this.chat.title}" chat`
           : `private messages with ${this.chat.first_name} ${this.chat.last_name}`
@@ -56,7 +58,7 @@ class Chat {
 
 bot.start((ctx) =>
   ctx.reply(
-    `🤖 This bot can try to predict the future price of Bitcoin using ChatGPT.\n\n🚀 Just write command /predict and write timeframe what you want 1m, 5m, 15m, 30m, 1h, 2h, 4h, 12h, 1d, 1w. (default 1h)`
+    `🤖 This bot can try to predict the future price of cryptocurrency using ChatGPT.\n\n🚀 Just write command /predict [coin] [timeframe] and write coin and timeframe what you want:\n\n🪙 Coins: BTC, ETH, XRP, LTC, XMR (default BTC)\n\n⏰ Timeframes: 1m, 5m, 15m, 30m, 1h, 2h, 4h, 12h, 1d, 1w. (default 1h)\n\n⚠️ This bot was created for experimental purposes and cannot predict the price of a cryptocurrency with 100% accuracy, and it does not provide any financial advices. Before using any information from the bot, it is better to conduct your own technical analysis of the market to better understand the situation on it.`
   )
 );
 
@@ -79,7 +81,8 @@ bot.command("predict", async (ctx) => {
     "You request is pending, please wait... ⏳"
   );
 
-  let timeframe = ctx.update.message.text.split(" ")[1];
+  let timeframe = ctx.update.message.text.split(" ")[2];
+  let coin = ctx.update.message.text.split(" ")[1];
 
   if (!timeframe) {
     timeframe = "1h";
@@ -96,12 +99,27 @@ bot.command("predict", async (ctx) => {
     }
   }
 
+  if (!coin) {
+    coin = "BTC";
+  } else {
+    const allowedCoin = !!allowedCoins.find((c) => c === coin.toUpperCase());
+    if (!allowedCoin) {
+      await bot.telegram.editMessageText(
+        chatId,
+        message_id,
+        message_id,
+        "⛔️ The coin you provided is not valid.\n\nAllowed coins - BTC, ETH, XRP, LTC, XMR."
+      );
+      return;
+    }
+  }
+
   const { data: candleData } = await request(
-    `https://api.taapi.io/candles?secret=${process.env.TAAPI_TOKEN}&exchange=binance&symbol=BTC/USDT&interval=${timeframe}&period=50`
+    `https://api.taapi.io/candles?secret=${process.env.TAAPI_TOKEN}&exchange=binance&symbol=${coin}/USDT&interval=${timeframe}&period=50`
   );
 
   const { data: rsiData } = await request(
-    `https://api.taapi.io/rsi?secret=${process.env.TAAPI_TOKEN}&exchange=binance&symbol=BTC/USDT&interval=${timeframe}&period=100`
+    `https://api.taapi.io/rsi?secret=${process.env.TAAPI_TOKEN}&exchange=binance&symbol=${coin}/USDT&interval=${timeframe}&period=100`
   );
 
   const { data: fearAndGreed } = await getFearAndGreedIndex();
@@ -113,6 +131,7 @@ bot.command("predict", async (ctx) => {
           `Time: ${timestampHuman}, Open: ${open}, High: ${high}, Low: ${low}, Close: ${close}, Volume: ${volume}\n`
       )
       .join("") +
+    `\nCoin: ${coin}` +
     `\nRSI: ${rsiData.value}` +
     `\nTimeframe: ${timeframe}` +
     `\nFear & Greed index: Time: ${fearAndGreed.lastUpdated.humanDate}, FGI Now: ${fearAndGreed.fgi.now.value} ${fearAndGreed.fgi.now.valueText}, FGI Previous Close: ${fearAndGreed.fgi.previousClose.value} ${fearAndGreed.fgi.previousClose.valueText}, FGI One week ago: ${fearAndGreed.fgi.oneWeekAgo.value} ${fearAndGreed.fgi.oneWeekAgo.valueText}, FGI One Month ago: ${fearAndGreed.fgi.oneMonthAgo.value} ${fearAndGreed.fgi.oneMonthAgo.valueText}, FGI One Year ago: ${fearAndGreed.fgi.oneYearAgo.value} ${fearAndGreed.fgi.oneYearAgo.valueText}`;
@@ -130,7 +149,7 @@ bot.command("predict", async (ctx) => {
     chatId,
     message_id,
     message_id,
-    `📊 Timeframe - ${timeframe}, RSI - ${rsiData.value}, Fear & Greed Index - ${fearAndGreed.fgi.now.value}\n\n${aiResponse}`
+    `📊 Coin - ${coin}, Timeframe - ${timeframe}, RSI - ${rsiData.value}, Fear & Greed Index - ${fearAndGreed.fgi.now.value}\n\n${aiResponse}\n\n⚠️ Not a financial advice.`
   );
 });
 
