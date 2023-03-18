@@ -27,7 +27,7 @@ export const askAI = (messages) =>
       .on("error", reject)
       .end(
         JSON.stringify({
-          model: "gpt-4",
+          model: "gpt-3.5-turbo",
           temperature: 0,
           presence_penalty: 1,
           frequency_penalty: 1.2,
